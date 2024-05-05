@@ -1,57 +1,104 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.24;
 
-contract MultiSigWallet {
-    event Deposit(address indexed sender, uint amount, uint balance);
+import "@openzeppelin/contracts/interfaces/IERC1155.sol";
+import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import "@openzeppelin/contracts/interfaces/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
+import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract MultiSigWallet is ERC721Holder, ERC1155Holder {
+    bool internal locked;
+
+    event Deposit(address indexed sender, uint256 amount, uint256 balance);
     event SubmitTransaction(
         address indexed owner,
-        uint indexed txIndex,
+        uint256 indexed txIndex,
         address indexed to,
-        uint value,
-        bytes data
+        uint256 value,
+        address currencyAdrress,
+        uint256 currencyType
     );
-    event ConfirmTransaction(address indexed owner, uint indexed txIndex);
-    event RevokeConfirmation(address indexed owner, uint indexed txIndex);
-    event ExecuteTransaction(address indexed owner, uint indexed txIndex);
+    event SubmitTransactionOwner(
+        address indexed owner,
+        uint256 indexed txIndex,
+        address ownerSuggested,
+        uint256 numConfirmations,
+        bool addOwner
+    );
+    event ConfirmTransaction(address indexed owner, uint256 indexed txIndex);
+    event RevokeConfirmation(address indexed owner, uint256 indexed txIndex);
+    event ExecuteTransaction(address indexed owner, uint256 indexed txIndex);
 
     address[] public owners;
     mapping(address => bool) public isOwner;
-    uint public numConfirmationsRequired;
+    uint256 public numConfirmationsRequired;
 
     struct Transaction {
         address to;
-        uint value;
-        bytes data;
+        uint256 value;
         bool executed;
-        uint numConfirmations;
+        uint256 numConfirmations;
+        uint8 currencyType;
+        address currencyAdrress;
+        uint256 ID;
+    }
+    struct TransactionOwner {
+        address owner;
+        bool executed;
+        uint256 numConfirmations;
+        bool addOwner;
     }
 
     // mapping from tx index => owner => bool
-    mapping(uint => mapping(address => bool)) public isConfirmed;
-
+    mapping(uint256 => mapping(address => bool)) public isConfirmed;
+    mapping(uint256 => mapping(address => bool)) public isConfirmedOwner;
     Transaction[] public transactions;
+    TransactionOwner[] public transactionsOwner;
 
+    modifier noReentrant() {
+        require(!locked, "No re-entrancy");
+        locked = true;
+        _;
+        locked = false;
+    }
     modifier onlyOwner() {
         require(isOwner[msg.sender], "not owner");
         _;
     }
 
-    modifier txExists(uint _txIndex) {
+    modifier txExists(uint256 _txIndex) {
         require(_txIndex < transactions.length, "tx does not exist");
         _;
     }
+    modifier txExistsOwner(uint256 _txIndex) {
+        require(_txIndex < transactionsOwner.length, "tx does not exist");
+        _;
+    }
 
-    modifier notExecuted(uint _txIndex) {
+    modifier notExecuted(uint256 _txIndex) {
         require(!transactions[_txIndex].executed, "tx already executed");
         _;
     }
-
-    modifier notConfirmed(uint _txIndex) {
-        require(!isConfirmed[_txIndex][msg.sender], "tx already confirmed");
+    modifier notExecutedOwner(uint256 _txIndex) {
+        require(!transactionsOwner[_txIndex].executed, "tx already executed");
         _;
     }
 
-    constructor(address[] memory _owners, uint _numConfirmationsRequired) {
+    modifier notConfirmed(uint256 _txIndex) {
+        require(!isConfirmed[_txIndex][msg.sender], "tx already confirmed");
+        _;
+    }
+    modifier notConfirmedOwner(uint256 _txIndex) {
+        require(
+            !isConfirmedOwner[_txIndex][msg.sender],
+            "tx already confirmed"
+        );
+        _;
+    }
+
+    constructor(address[] memory _owners, uint256 _numConfirmationsRequired) {
         require(_owners.length > 0, "owners required");
         require(
             _numConfirmationsRequired > 0 &&
@@ -59,7 +106,7 @@ contract MultiSigWallet {
             "invalid number of required confirmations"
         );
 
-        for (uint i = 0; i < _owners.length; i++) {
+        for (uint256 i = 0; i < _owners.length; i++) {
             address owner = _owners[i];
 
             require(owner != address(0), "invalid owner");
@@ -78,63 +125,147 @@ contract MultiSigWallet {
 
     function submitTransaction(
         address _to,
-        uint _value,
-        bytes memory _data
+        uint256 _value,
+        uint8 _currencyType,
+        address _currencyAdrress,
+        uint256 ID
     ) public onlyOwner {
-        uint txIndex = transactions.length;
+        uint256 txIndex = transactions.length;
 
         transactions.push(
             Transaction({
                 to: _to,
                 value: _value,
-                data: _data,
                 executed: false,
-                numConfirmations: 0
+                numConfirmations: 0,
+                currencyType: _currencyType,
+                currencyAdrress: _currencyAdrress,
+                ID: ID
             })
         );
 
-        emit SubmitTransaction(msg.sender, txIndex, _to, _value, _data);
+        emit SubmitTransaction(
+            msg.sender,
+            txIndex,
+            _to,
+            _value,
+            _currencyAdrress,
+            _currencyType
+        );
     }
 
-    function confirmTransaction(
-        uint _txIndex
-    )
+    function submitTransactionOwner(
+        address _Owner,
+        uint256 _numConfirmations,
+        bool _addOwner
+    ) public onlyOwner {
+        uint256 txIndex = transactions.length;
+
+        transactionsOwner.push(
+            TransactionOwner({
+                owner: _Owner,
+                executed: false,
+                numConfirmations: _numConfirmations,
+                addOwner: _addOwner
+            })
+        );
+        emit SubmitTransactionOwner(
+            msg.sender,
+            txIndex,
+            _Owner,
+            _numConfirmations,
+            _addOwner
+        );
+    }
+
+    function confirmTransactionOwner(uint256 _txIndex)
+        public
+        onlyOwner
+        txExistsOwner(_txIndex)
+        notExecutedOwner(_txIndex)
+        notConfirmedOwner(_txIndex)
+    {
+        transactionsOwner[_txIndex].numConfirmations += 1;
+        isConfirmedOwner[_txIndex][msg.sender] = true;
+        emit ConfirmTransaction(msg.sender, _txIndex);
+    }
+
+    function confirmTransaction(uint256 _txIndex)
         public
         onlyOwner
         txExists(_txIndex)
         notExecuted(_txIndex)
         notConfirmed(_txIndex)
     {
-        Transaction storage transaction = transactions[_txIndex];
-        transaction.numConfirmations += 1;
+        transactions[_txIndex].numConfirmations += 1;
         isConfirmed[_txIndex][msg.sender] = true;
-
         emit ConfirmTransaction(msg.sender, _txIndex);
     }
 
-    function executeTransaction(
-        uint _txIndex
-    ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
+    function executeTransactionOwner(uint256 _txIndex)
+        public
+        onlyOwner
+        txExistsOwner(_txIndex)
+        notExecutedOwner(_txIndex)
+    {
+        transactionsOwner[_txIndex].executed = true;
+        if (transactionsOwner[_txIndex].addOwner == true) {
+            require(
+                isOwner[transactionsOwner[_txIndex].owner] == false,
+                "It's her owner"
+            );
+            owners.push(transactionsOwner[_txIndex].owner);
+        }
+        ////////////////////////////////////////////////////////
+    }
+
+    function executeTransaction(uint256 _txIndex)
+        public
+        onlyOwner
+        txExists(_txIndex)
+        notExecuted(_txIndex)
+        noReentrant
+    {
         Transaction storage transaction = transactions[_txIndex];
 
         require(
-            transaction.numConfirmations >= numConfirmationsRequired,
+            transactions[_txIndex].numConfirmations >= numConfirmationsRequired,
             "cannot execute tx"
         );
 
-        transaction.executed = true;
+        transactions[_txIndex].executed = true;
 
-        (bool success, ) = transaction.to.call{value: transaction.value}(
-            transaction.data
-        );
-        require(success, "tx failed");
+        if (transaction.currencyType == 0) {
+            IERC721(transaction.currencyAdrress).safeTransferFrom(
+                msg.sender,
+                transaction.to,
+                transaction.value
+            );
+        } else if (transaction.currencyType == 1) {
+            IERC1155(transaction.currencyAdrress).safeTransferFrom(
+                msg.sender,
+                transaction.to,
+                transaction.ID,
+                transaction.value,
+                ""
+            );
+        } else if (transaction.currencyType == 2) {
+            IERC20(transaction.currencyAdrress).transferFrom(
+                msg.sender,
+                transaction.to,
+                transaction.value
+            );
+        }
 
         emit ExecuteTransaction(msg.sender, _txIndex);
     }
 
-    function revokeConfirmation(
-        uint _txIndex
-    ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
+    function revokeConfirmation(uint256 _txIndex)
+        public
+        onlyOwner
+        txExists(_txIndex)
+        notExecuted(_txIndex)
+    {
         Transaction storage transaction = transactions[_txIndex];
 
         require(isConfirmed[_txIndex][msg.sender], "tx not confirmed");
@@ -149,21 +280,18 @@ contract MultiSigWallet {
         return owners;
     }
 
-    function getTransactionCount() public view returns (uint) {
+    function getTransactionCount() public view returns (uint256) {
         return transactions.length;
     }
 
-    function getTransaction(
-        uint _txIndex
-    )
+    function getTransaction(uint256 _txIndex)
         public
         view
         returns (
             address to,
-            uint value,
-            bytes memory data,
+            uint256 value,
             bool executed,
-            uint numConfirmations
+            uint256 numConfirmations
         )
     {
         Transaction storage transaction = transactions[_txIndex];
@@ -171,7 +299,6 @@ contract MultiSigWallet {
         return (
             transaction.to,
             transaction.value,
-            transaction.data,
             transaction.executed,
             transaction.numConfirmations
         );
