@@ -31,7 +31,6 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
     event RevokeConfirmation(address indexed owner, uint256 indexed txIndex);
     event ExecuteTransaction(address indexed owner, uint256 indexed txIndex);
 
-    address[] public owners;
     mapping(address => bool) public isOwner;
     uint256 public numConfirmationsRequired;
 
@@ -113,7 +112,6 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
             require(!isOwner[owner], "owner not unique");
 
             isOwner[owner] = true;
-            owners.push(owner);
         }
 
         numConfirmationsRequired = _numConfirmationsRequired;
@@ -131,7 +129,7 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
         uint256 ID
     ) public onlyOwner {
         uint256 txIndex = transactions.length;
-
+        require(_currencyType < 3, "This type of currency does not exist");
         transactions.push(
             Transaction({
                 to: _to,
@@ -160,12 +158,11 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
         bool _addOwner
     ) public onlyOwner {
         uint256 txIndex = transactions.length;
-
         transactionsOwner.push(
             TransactionOwner({
                 owner: _Owner,
                 executed: false,
-                numConfirmations: _numConfirmations,
+                numConfirmations: 0,
                 addOwner: _addOwner
             })
         );
@@ -214,12 +211,22 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
                 isOwner[transactionsOwner[_txIndex].owner] == false,
                 "It's her owner"
             );
-            owners.push(transactionsOwner[_txIndex].owner);
-        } else {
+            require(
+                transactionsOwner[_txIndex].owner != address(0),
+                "invalid owner"
+            );
+            require(
+                !isOwner[transactionsOwner[_txIndex].owner],
+                "owner not unique"
+            );
+
+            isOwner[transactionsOwner[_txIndex].owner] = true;
+        } else if (transactionsOwner[_txIndex].addOwner == false) {
             require(
                 isOwner[transactionsOwner[_txIndex].owner] == true,
                 "It's her owner"
-            ); // و فانکشن هارو کامل کن به مپینگ تبدیل گن ارایه اونرز رو
+            );
+            isOwner[transactionsOwner[_txIndex].owner] = false;
         }
     }
 
@@ -241,21 +248,20 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
 
         if (transaction.currencyType == 0) {
             IERC721(transaction.currencyAdrress).safeTransferFrom(
-                msg.sender,
+                address(this),
                 transaction.to,
-                transaction.value
+                transaction.ID
             );
         } else if (transaction.currencyType == 1) {
             IERC1155(transaction.currencyAdrress).safeTransferFrom(
-                msg.sender,
+                address(this),
                 transaction.to,
                 transaction.ID,
                 transaction.value,
                 ""
             );
         } else if (transaction.currencyType == 2) {
-            IERC20(transaction.currencyAdrress).transferFrom(
-                msg.sender,
+            IERC20(transaction.currencyAdrress).transfer(
                 transaction.to,
                 transaction.value
             );
@@ -280,22 +286,39 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
         emit RevokeConfirmation(msg.sender, _txIndex);
     }
 
-    function getOwners() public view returns (address[] memory) {
-        return owners;
+    function revokeConfirmationOwner(uint256 _txIndex)
+        public
+        onlyOwner
+        txExistsOwner(_txIndex)
+        notExecutedOwner(_txIndex)
+    {
+        require(isConfirmedOwner[_txIndex][msg.sender], "tx not confirmed");
+
+        transactionsOwner[_txIndex].numConfirmations -= 1;
+        isConfirmedOwner[_txIndex][msg.sender] = false;
+
+        emit RevokeConfirmation(msg.sender, _txIndex);
     }
 
     function getTransactionCount() public view returns (uint256) {
         return transactions.length;
     }
 
+    function getTransactionCountOwner() public view returns (uint256) {
+        return transactionsOwner.length;
+    }
+
     function getTransaction(uint256 _txIndex)
         public
         view
         returns (
-            address to,
+            address owner,
             uint256 value,
             bool executed,
-            uint256 numConfirmations
+            uint256 numConfirmations,
+            uint8 currencyType,
+            address currencyAdrress,
+            uint256 ID
         )
     {
         Transaction storage transaction = transactions[_txIndex];
@@ -304,7 +327,30 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
             transaction.to,
             transaction.value,
             transaction.executed,
-            transaction.numConfirmations
+            transaction.numConfirmations,
+            transaction.currencyType,
+            transaction.currencyAdrress,
+            transaction.ID
+        );
+    }
+
+    function getTransactionOwner(uint256 _txIndex)
+        public
+        view
+        returns (
+            address owner,
+            bool executed,
+            uint256 numConfirmations,
+            bool addOwner
+        )
+    {
+        TransactionOwner storage transaction = transactionsOwner[_txIndex];
+
+        return (
+            transaction.owner,
+            transaction.executed,
+            transaction.numConfirmations,
+            transaction.addOwner
         );
     }
 }
