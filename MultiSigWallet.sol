@@ -215,8 +215,12 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
                 "It's her owner"
             );
             owners.push(transactionsOwner[_txIndex].owner);
+        } else {
+            require(
+                isOwner[transactionsOwner[_txIndex].owner] == true,
+                "It's her owner"
+            ); // و فانکشن هارو کامل کن به مپینگ تبدیل گن ارایه اونرز رو
         }
-        ////////////////////////////////////////////////////////
     }
 
     function executeTransaction(uint256 _txIndex)
