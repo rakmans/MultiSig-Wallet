@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/interfaces/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract MultiSigWallet is ERC721Holder, ERC1155Holder {
     bool internal locked;
