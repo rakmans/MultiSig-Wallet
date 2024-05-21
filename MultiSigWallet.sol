@@ -9,32 +9,7 @@ import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 contract MultiSigWallet is ERC721Holder, ERC1155Holder {
     bool internal locked;
-    uint256 public NumberOfOwners;
-    event Deposit(address indexed sender, uint256 amount, uint256 balance);
-    event SubmitTransaction(
-        address indexed owner,
-        uint256 indexed txIndex,
-        address indexed to,
-        uint256 value,
-        address currencyAdrress,
-        uint256 currencyType
-    );
-    event SubmitTransactionOwner(
-        address indexed owner,
-        uint256 indexed txIndex,
-        address ownerSuggested,
-        bool addOwner
-    );
-    event SubmitTransactionNewNumConfirmations(
-        uint indexed NewNumConfirmations,
-        uint256 indexed txIndex,
-        address ownerSuggested
-    );
-    event ConfirmTransaction(address indexed owner, uint256 indexed txIndex);
-    event RevokeConfirmation(address indexed owner, uint256 indexed txIndex);
-    event ExecuteTransaction(address indexed owner, uint256 indexed txIndex);
-
-    mapping(address => bool) public isOwner;
+    uint256 public numberOfOwners;
     uint256 public numConfirmationsRequired;
 
     struct Transaction {
@@ -57,15 +32,40 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
         bool executed;
         uint256 numConfirmations;
     }
+    Transaction[] public transactions;
+    TransactionOwner[] public transactionsOwner;
+    TransactionNewNumConfirmations[] public transactionNewNumConfirmations;
+    mapping(address => bool) public isOwner;
+
     // mapping from tx index => owner => bool
     mapping(uint256 => mapping(address => bool)) public isConfirmed;
     mapping(uint256 => mapping(address => bool)) public isConfirmedOwner;
     mapping(uint256 => mapping(address => bool))
         public isConfirmedNewNumConfirmations;
 
-    Transaction[] public transactions;
-    TransactionOwner[] public transactionsOwner;
-    TransactionNewNumConfirmations[] public transactionNewNumConfirmations;
+    event SubmitTransaction(
+        address indexed owner,
+        uint256 indexed txIndex,
+        address indexed to,
+        uint256 value,
+        address currencyAdrress,
+        uint8 currencyType
+    );
+    event SubmitTransactionOwner(
+        address indexed owner,
+        uint256 indexed txIndex,
+        address ownerSuggested,
+        bool addOwner
+    );
+    event SubmitTransactionNewNumConfirmations(
+        uint256 indexed NewNumConfirmations,
+        uint256 indexed txIndex,
+        address ownerSuggested
+    );
+    event ConfirmTransaction(address indexed owner, uint256 indexed txIndex);
+    event RevokeConfirmation(address indexed owner, uint256 indexed txIndex);
+    event ExecuteTransaction(address indexed owner, uint256 indexed txIndex);
+
     modifier noReentrant() {
         require(!locked, "No re-entrancy");
         locked = true;
@@ -77,83 +77,68 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
         _;
     }
 
-    modifier txExists(uint256 _txIndex, int8 operation) {
+    modifier notExecuted(uint256 txIndex, uint8 operation) {
         if (operation == 1) {
-            require(_txIndex < transactions.length, "tx does not exist");
-        } else if (operation == 2) {
-            require(_txIndex < transactionsOwner.length, "tx does not exist");
-        } else if (operation == 3) {
-            require(
-                _txIndex < transactionNewNumConfirmations.length,
-                "tx does not exist"
-            );
-        }
-
-        _;
-    }
-
-    modifier notExecuted(uint256 _txIndex, int8 operation) {
-        if (operation == 1) {
-            require(!transactions[_txIndex].executed, "tx already executed");
+            require(!transactions[txIndex].executed, "tx already executed");
         } else if (operation == 2) {
             require(
-                !transactionsOwner[_txIndex].executed,
+                !transactionsOwner[txIndex].executed,
                 "tx already executed"
             );
         } else if (operation == 3) {
             require(
-                !transactionNewNumConfirmations[_txIndex].executed,
+                !transactionNewNumConfirmations[txIndex].executed,
                 "tx already executed"
             );
         }
         _;
     }
 
-    modifier notConfirmed(uint256 _txIndex, int8 operation) {
+    modifier notConfirmed(uint256 txIndex, uint8 operation) {
         if (operation == 1) {
-            require(!isConfirmed[_txIndex][msg.sender], "tx already confirmed");
+            require(!isConfirmed[txIndex][msg.sender], "tx already confirmed");
         } else if (operation == 2) {
             require(
-                !isConfirmedOwner[_txIndex][msg.sender],
+                !isConfirmedOwner[txIndex][msg.sender],
                 "tx already confirmed"
             );
         } else if (operation == 3) {
             require(
-                !isConfirmedNewNumConfirmations[_txIndex][msg.sender],
+                !isConfirmedNewNumConfirmations[txIndex][msg.sender],
                 "tx already confirmed"
             );
         }
         _;
     }
-    modifier confirmed(uint256 _txIndex, int8 operation) {
+    modifier confirmed(uint256 txIndex, uint8 operation) {
         if (operation == 1) {
-            require(isConfirmed[_txIndex][msg.sender], "tx not confirmed");
+            require(isConfirmed[txIndex][msg.sender], "tx not confirmed");
         } else if (operation == 2) {
-            require(isConfirmedOwner[_txIndex][msg.sender], "tx not confirmed");
+            require(isConfirmedOwner[txIndex][msg.sender], "tx not confirmed");
         } else if (operation == 3) {
             require(
-                isConfirmedNewNumConfirmations[_txIndex][msg.sender],
+                isConfirmedNewNumConfirmations[txIndex][msg.sender],
                 "tx not confirmed"
             );
         }
         _;
     }
-    modifier numRequired(uint256 _txIndex, int8 operation) {
+    modifier numRequired(uint256 txIndex, uint8 operation) {
         if (operation == 1) {
             require(
-                transactions[_txIndex].numConfirmations >=
+                transactions[txIndex].numConfirmations >=
                     numConfirmationsRequired,
                 "cannot execute tx"
             );
         } else if (operation == 2) {
             require(
-                transactionsOwner[_txIndex].numConfirmations >=
+                transactionsOwner[txIndex].numConfirmations >=
                     numConfirmationsRequired,
                 "cannot execute tx"
             );
         } else if (operation == 3) {
             require(
-                transactionNewNumConfirmations[_txIndex].numConfirmations >=
+                transactionNewNumConfirmations[txIndex].numConfirmations >=
                     numConfirmationsRequired,
                 "cannot execute tx"
             );
@@ -161,16 +146,16 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
         _;
     }
 
-    constructor(address[] memory _owners, uint256 _numConfirmationsRequired) {
-        require(_owners.length > 0, "owners required");
+    constructor(address[] memory owners, uint256 numberConfirmationsRequired) {
+        require(owners.length > 0, "owners required");
         require(
-            _numConfirmationsRequired > 0 &&
-                _numConfirmationsRequired <= _owners.length,
+            numberConfirmationsRequired > 0 &&
+                numberConfirmationsRequired <= owners.length,
             "invalid number of required confirmations"
         );
 
-        for (uint256 i = 0; i < _owners.length; i++) {
-            address owner = _owners[i];
+        for (uint256 i = 0; i < owners.length; i++) {
+            address owner = owners[i];
 
             require(owner != address(0), "invalid owner");
             require(!isOwner[owner], "owner not unique");
@@ -178,31 +163,27 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
             isOwner[owner] = true;
         }
 
-        numConfirmationsRequired = _numConfirmationsRequired;
-        NumberOfOwners = _owners.length;
-    }
-
-    receive() external payable {
-        emit Deposit(msg.sender, msg.value, address(this).balance);
+        numConfirmationsRequired = numberConfirmationsRequired;
+        numberOfOwners = owners.length;
     }
 
     function submitTransaction(
-        address _to,
-        uint256 _value,
-        uint8 _currencyType,
-        address _currencyAdrress,
+        address to,
+        uint256 value,
+        uint8 currencyType,
+        address currencyAdrress,
         uint256 ID
-    ) public onlyOwner {
+    ) external onlyOwner {
         uint256 txIndex = transactions.length;
-        require(_currencyType < 3, "This type of currency does not exist");
+        require(currencyType < 3, "This type of currency does not exist");
         transactions.push(
             Transaction({
-                to: _to,
-                value: _value,
+                to: to,
+                value: value,
                 executed: false,
                 numConfirmations: 0,
-                currencyType: _currencyType,
-                currencyAdrress: _currencyAdrress,
+                currencyType: currencyType,
+                currencyAdrress: currencyAdrress,
                 ID: ID
             })
         );
@@ -210,152 +191,34 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
         emit SubmitTransaction(
             msg.sender,
             txIndex,
-            _to,
-            _value,
-            _currencyAdrress,
-            _currencyType
+            to,
+            value,
+            currencyAdrress,
+            currencyType
         );
-    }
-
-    function submitTransactionOwner(
-        address _Owner,
-        bool _addOwner
-    ) public onlyOwner {
-        uint256 txIndex = transactions.length;
-        if (_addOwner == true) {
-            require(!isOwner[_Owner], "It's her owner");
-            require(_Owner != address(0), "invalid owner");
-        } else {
-            require(isOwner[_Owner], "It's not owner");
-        }
-        transactionsOwner.push(
-            TransactionOwner({
-                owner: _Owner,
-                executed: false,
-                numConfirmations: 0,
-                addOwner: _addOwner
-            })
-        );
-        emit SubmitTransactionOwner(msg.sender, txIndex, _Owner, _addOwner);
-    }
-
-    function submitTransactionNewNumConfirmations(
-        uint256 NewNumConfirmations
-    ) public onlyOwner {
-        require(
-            NewNumConfirmations > 0 &&
-                NewNumConfirmations <= NumberOfOwners &&
-                NewNumConfirmations != numConfirmationsRequired,
-            "invalid number of required confirmations"
-        );
-        uint256 txIndex = transactionNewNumConfirmations.length;
-        transactionNewNumConfirmations.push(
-            TransactionNewNumConfirmations({
-                NewNumConfirmations: NewNumConfirmations,
-                executed: false,
-                numConfirmations: 0
-            })
-        );
-        emit SubmitTransactionNewNumConfirmations(
-            NewNumConfirmations,
-            txIndex,
-            msg.sender
-        );
-    }
-
-    function confirmTransactionNewNumConfirmations(
-        uint256 _txIndex
-    )
-        public
-        onlyOwner
-        txExists(_txIndex, 3)
-        notExecuted(_txIndex, 3)
-        notConfirmed(_txIndex, 3)
-    {
-        transactionNewNumConfirmations[_txIndex].numConfirmations += 1;
-        isConfirmedNewNumConfirmations[_txIndex][msg.sender] = true;
-        emit ConfirmTransaction(msg.sender, _txIndex);
-    }
-
-    function confirmTransactionOwner(
-        uint256 _txIndex
-    )
-        public
-        onlyOwner
-        txExists(_txIndex, 2)
-        notExecuted(_txIndex, 2)
-        notConfirmed(_txIndex, 2)
-    {
-        transactionsOwner[_txIndex].numConfirmations += 1;
-        isConfirmedOwner[_txIndex][msg.sender] = true;
-        emit ConfirmTransaction(msg.sender, _txIndex);
     }
 
     function confirmTransaction(
-        uint256 _txIndex
-    )
-        public
-        onlyOwner
-        txExists(_txIndex, 1)
-        notExecuted(_txIndex, 1)
-        notConfirmed(_txIndex, 1)
-    {
-        transactions[_txIndex].numConfirmations += 1;
-        isConfirmed[_txIndex][msg.sender] = true;
-        emit ConfirmTransaction(msg.sender, _txIndex);
-    }
-
-    function executeTransactionOwner(
-        uint256 _txIndex
-    )
-        public
-        onlyOwner
-        txExists(_txIndex, 2)
-        notExecuted(_txIndex, 2)
-        numRequired(_txIndex, 2)
-    {
-        transactionsOwner[_txIndex].executed = true;
-
-        if (transactionsOwner[_txIndex].addOwner == true) {
-            NumberOfOwners += 1;
-            isOwner[transactionsOwner[_txIndex].owner] = true;
-        } else if (transactionsOwner[_txIndex].addOwner == false) {
-            NumberOfOwners -= 1;
-
-            isOwner[transactionsOwner[_txIndex].owner] = false;
-        }
-        emit ExecuteTransaction(msg.sender, _txIndex);
-    }
-
-    function executeTransactionNewNumConfirmations(
-        uint256 _txIndex
-    )
-        public
-        onlyOwner
-        txExists(_txIndex, 3)
-        notExecuted(_txIndex, 3)
-        numRequired(_txIndex, 3)
-    {
-        transactionNewNumConfirmations[_txIndex].executed = true;
-        numConfirmationsRequired = transactionNewNumConfirmations[_txIndex]
-            .NewNumConfirmations;
-        emit ExecuteTransaction(msg.sender, _txIndex);
+        uint256 txIndex
+    ) external onlyOwner notExecuted(txIndex, 1) notConfirmed(txIndex, 1) {
+        transactions[txIndex].numConfirmations += 1;
+        isConfirmed[txIndex][msg.sender] = true;
+        emit ConfirmTransaction(msg.sender, txIndex);
     }
 
     function executeTransaction(
-        uint256 _txIndex
+        uint256 txIndex
     )
-        public
+        external
         payable
         onlyOwner
-        txExists(_txIndex, 1)
-        notExecuted(_txIndex, 1)
+        notExecuted(txIndex, 1)
         noReentrant
-        numRequired(_txIndex, 1)
+        numRequired(txIndex, 1)
     {
-        Transaction storage transaction = transactions[_txIndex];
+        Transaction storage transaction = transactions[txIndex];
 
-        transactions[_txIndex].executed = true;
+        transactions[txIndex].executed = true;
 
         if (transaction.currencyType == 0) {
             IERC721(transaction.currencyAdrress).safeTransferFrom(
@@ -378,69 +241,138 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
             );
         }
 
-        emit ExecuteTransaction(msg.sender, _txIndex);
+        emit ExecuteTransaction(msg.sender, txIndex);
     }
 
     function revokeConfirmation(
-        uint256 _txIndex
-    )
-        public
-        onlyOwner
-        txExists(_txIndex, 1)
-        notExecuted(_txIndex, 1)
-        confirmed(_txIndex, 1)
-    {
-        Transaction storage transaction = transactions[_txIndex];
+        uint256 txIndex
+    ) external onlyOwner notExecuted(txIndex, 1) confirmed(txIndex, 1) {
+        Transaction storage transaction = transactions[txIndex];
 
         transaction.numConfirmations -= 1;
-        isConfirmed[_txIndex][msg.sender] = false;
+        isConfirmed[txIndex][msg.sender] = false;
 
-        emit RevokeConfirmation(msg.sender, _txIndex);
+        emit RevokeConfirmation(msg.sender, txIndex);
     }
 
-    function revokeConfirmationNewNumConfirmations(
-        uint256 _txIndex
-    )
-        public
-        onlyOwner
-        txExists(_txIndex, 3)
-        confirmed(_txIndex, 3)
-        notExecuted(_txIndex, 3)
-    {
-        TransactionNewNumConfirmations
-            storage transaction = transactionNewNumConfirmations[_txIndex];
+    function submitTransactionOwner(
+        address owner,
+        bool addOwner
+    ) external onlyOwner {
+        uint256 txIndex = transactions.length;
+        if (addOwner == true) {
+            require(!isOwner[owner], "It's her owner");
+            require(owner != address(0), "invalid owner");
+        } else {
+            require(isOwner[owner], "It's not owner");
+        }
+        transactionsOwner.push(
+            TransactionOwner({
+                owner: owner,
+                executed: false,
+                numConfirmations: 0,
+                addOwner: addOwner
+            })
+        );
+        emit SubmitTransactionOwner(msg.sender, txIndex, owner, addOwner);
+    }
 
-        transaction.numConfirmations -= 1;
-        isConfirmed[_txIndex][msg.sender] = false;
+    function confirmTransactionOwner(
+        uint256 txIndex
+    ) external onlyOwner notExecuted(txIndex, 2) notConfirmed(txIndex, 2) {
+        transactionsOwner[txIndex].numConfirmations += 1;
+        isConfirmedOwner[txIndex][msg.sender] = true;
+        emit ConfirmTransaction(msg.sender, txIndex);
+    }
 
-        emit RevokeConfirmation(msg.sender, _txIndex);
+    function executeTransactionOwner(
+        uint256 txIndex
+    ) external onlyOwner notExecuted(txIndex, 2) numRequired(txIndex, 2) {
+        transactionsOwner[txIndex].executed = true;
+
+        if (transactionsOwner[txIndex].addOwner == true) {
+            numberOfOwners += 1;
+            isOwner[transactionsOwner[txIndex].owner] = true;
+        } else if (transactionsOwner[txIndex].addOwner == false) {
+            numberOfOwners -= 1;
+
+            isOwner[transactionsOwner[txIndex].owner] = false;
+        }
+        emit ExecuteTransaction(msg.sender, txIndex);
     }
 
     function revokeConfirmationOwner(
-        uint256 _txIndex
-    )
-        public
-        onlyOwner
-        txExists(_txIndex, 2)
-        notExecuted(_txIndex, 2)
-        confirmed(_txIndex, 2)
-    {
-        transactionsOwner[_txIndex].numConfirmations -= 1;
-        isConfirmedOwner[_txIndex][msg.sender] = false;
+        uint256 txIndex
+    ) external onlyOwner notExecuted(txIndex, 2) confirmed(txIndex, 2) {
+        transactionsOwner[txIndex].numConfirmations -= 1;
+        isConfirmedOwner[txIndex][msg.sender] = false;
 
-        emit RevokeConfirmation(msg.sender, _txIndex);
+        emit RevokeConfirmation(msg.sender, txIndex);
     }
 
-    function getTransactionCount() public view returns (uint256) {
+    function submitTransactionNewNumConfirmations(
+        uint256 newNumConfirmations
+    ) external onlyOwner {
+        require(
+            newNumConfirmations > 0 &&
+                newNumConfirmations <= numberOfOwners &&
+                newNumConfirmations != numConfirmationsRequired,
+            "invalid number of required confirmations"
+        );
+        uint256 txIndex = transactionNewNumConfirmations.length;
+        transactionNewNumConfirmations.push(
+            TransactionNewNumConfirmations({
+                NewNumConfirmations: newNumConfirmations,
+                executed: false,
+                numConfirmations: 0
+            })
+        );
+        emit SubmitTransactionNewNumConfirmations(
+            newNumConfirmations,
+            txIndex,
+            msg.sender
+        );
+    }
+
+    function confirmTransactionNewNumConfirmations(
+        uint256 txIndex
+    ) external onlyOwner notExecuted(txIndex, 3) notConfirmed(txIndex, 3) {
+        transactionNewNumConfirmations[txIndex].numConfirmations += 1;
+        isConfirmedNewNumConfirmations[txIndex][msg.sender] = true;
+        emit ConfirmTransaction(msg.sender, txIndex);
+    }
+
+    function executeTransactionNewNumConfirmations(
+        uint256 txIndex
+    ) external onlyOwner notExecuted(txIndex, 3) numRequired(txIndex, 3) {
+        transactionNewNumConfirmations[txIndex].executed = true;
+        numConfirmationsRequired = transactionNewNumConfirmations[txIndex]
+            .NewNumConfirmations;
+        emit ExecuteTransaction(msg.sender, txIndex);
+    }
+
+    function revokeConfirmationNewNumConfirmations(
+        uint256 txIndex
+    ) external onlyOwner confirmed(txIndex, 3) notExecuted(txIndex, 3) {
+        TransactionNewNumConfirmations
+            storage transaction = transactionNewNumConfirmations[txIndex];
+
+        transaction.numConfirmations -= 1;
+        isConfirmed[txIndex][msg.sender] = false;
+
+        emit RevokeConfirmation(msg.sender, txIndex);
+    }
+
+    function getTransactionCount() external view returns (uint256) {
         return transactions.length;
     }
 
-    function getTransactionCountOwner() public view returns (uint256) {
+    function getTransactionCountOwner() external view returns (uint256) {
         return transactionsOwner.length;
     }
 
     function getTransactionCountNewNumConfirmations()
-        public
+        external
         view
         returns (uint256)
     {
@@ -448,9 +380,9 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
     }
 
     function getTransaction(
-        uint256 _txIndex
+        uint256 txIndex
     )
-        public
+        external
         view
         returns (
             address owner,
@@ -462,7 +394,7 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
             uint256 ID
         )
     {
-        Transaction storage transaction = transactions[_txIndex];
+        Transaction storage transaction = transactions[txIndex];
 
         return (
             transaction.to,
@@ -476,9 +408,9 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
     }
 
     function getTransactionOwner(
-        uint256 _txIndex
+        uint256 txIndex
     )
-        public
+        external
         view
         returns (
             address owner,
@@ -487,7 +419,7 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
             bool addOwner
         )
     {
-        TransactionOwner storage transaction = transactionsOwner[_txIndex];
+        TransactionOwner storage transaction = transactionsOwner[txIndex];
 
         return (
             transaction.owner,
@@ -498,9 +430,9 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
     }
 
     function getTransactionNewNumConfirmations(
-        uint256 _txIndex
+        uint256 txIndex
     )
-        public
+        external
         view
         returns (
             uint256 NewNumConfirmations,
@@ -509,7 +441,7 @@ contract MultiSigWallet is ERC721Holder, ERC1155Holder {
         )
     {
         TransactionNewNumConfirmations
-            storage transaction = transactionNewNumConfirmations[_txIndex];
+            storage transaction = transactionNewNumConfirmations[txIndex];
 
         return (
             transaction.NewNumConfirmations,
