@@ -152,7 +152,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.submitTransactionOwner(owners[0], true)
         ).to.be.revertedWith("It's her owner");
       });
-      it("Should revert with the right error if _Owner == address(0) ", async () => {
+      it("Should revert with the right error if owner == address(0) ", async () => {
         const { multiSigWallet } = await loadFixture(deploy);
         await expect(
           multiSigWallet.submitTransactionOwner(
@@ -180,12 +180,12 @@ describe("MultiSigWallet", () => {
       });
     });
     describe("Executed", () => {
-      it("Should push the right in transactionsOwner if _addOwner == true", async () => {
+      it("Should push the right in transactionsOwner if addOwner == true", async () => {
         const { multiSigWallet, isNotOwner } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionOwner(isNotOwner, true);
         expect(await multiSigWallet.getTransactionCountOwner()).to.be.equal(1);
       });
-      it("Should push the right in transactionsOwner if _addOwner == false", async () => {
+      it("Should push the right in transactionsOwner if addOwner == false", async () => {
         const { multiSigWallet, owners } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionOwner(owners[0], false);
         expect(await multiSigWallet.getTransactionCountOwner()).to.be.equal(1);
@@ -202,19 +202,19 @@ describe("MultiSigWallet", () => {
             .submitTransactionNewNumConfirmations(2)
         ).to.be.revertedWith("not owner");
       });
-      it("Should revert with the right error if  NewNumConfirmations <= 0 ", async () => {
+      it("Should revert with the right error if  newNumConfirmations <= 0 ", async () => {
         const { multiSigWallet } = await loadFixture(deploy);
         await expect(
           multiSigWallet.submitTransactionNewNumConfirmations(0)
         ).to.be.revertedWith("invalid number of required confirmations");
       });
-      it("Should revert with the right error if NewNumConfirmations > NumberOfOwners ", async () => {
+      it("Should revert with the right error if newNumConfirmations > numberOfOwners ", async () => {
         const { multiSigWallet } = await loadFixture(deploy);
         await expect(
           multiSigWallet.submitTransactionNewNumConfirmations(4)
         ).to.be.revertedWith("invalid number of required confirmations");
       });
-      it("Should revert with the right error if  NewNumConfirmations == numConfirmationsRequired", async () => {
+      it("Should revert with the right error if  newNumConfirmations == numConfirmationsRequired", async () => {
         const { multiSigWallet } = await loadFixture(deploy);
         await expect(
           multiSigWallet.submitTransactionNewNumConfirmations(1)
@@ -250,7 +250,7 @@ describe("MultiSigWallet", () => {
         ).to.be.revertedWith("not owner");
       });
 
-      it("Should revert with the right error if transactionNewNumConfirmations[_txIndex].Executed == true", async () => {
+      it("Should revert with the right error if transactionNewNumConfirmations[txIndex].Executed == true", async () => {
         const { multiSigWallet, owners } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionNewNumConfirmations(2);
         await multiSigWallet.confirmTransactionNewNumConfirmations(0);
@@ -261,7 +261,7 @@ describe("MultiSigWallet", () => {
             .confirmTransactionNewNumConfirmations(0)
         ).to.be.revertedWith("tx already executed");
       });
-      it("Should revert with the right error if isConfirmedNewNumConfirmations[_txIndex][msg.sender] == true", async () => {
+      it("Should revert with the right error if isConfirmedNewNumConfirmations[txIndex][msg.sender] == true", async () => {
         const { multiSigWallet } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionNewNumConfirmations(2);
         await multiSigWallet.confirmTransactionNewNumConfirmations(0);
@@ -292,7 +292,7 @@ describe("MultiSigWallet", () => {
         ).to.be.revertedWith("not owner");
       });
 
-      it("Should revert with the right error if transactionsOwner[_txIndex].Executed == true", async () => {
+      it("Should revert with the right error if transactionsOwner[txIndex].Executed == true", async () => {
         const { multiSigWallet, isNotOwner, owners } = await loadFixture(
           deploy
         );
@@ -303,7 +303,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.connect(owners[1]).confirmTransactionOwner(0)
         ).to.be.revertedWith("tx already executed");
       });
-      it("Should revert with the right error if isConfirmedOwner[_txIndex][msg.sender] == true", async () => {
+      it("Should revert with the right error if isConfirmedOwner[txIndex][msg.sender] == true", async () => {
         const { multiSigWallet, isNotOwner } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionOwner(isNotOwner, true);
         await multiSigWallet.confirmTransactionOwner(0);
@@ -335,7 +335,7 @@ describe("MultiSigWallet", () => {
         ).to.be.revertedWith("not owner");
       });
 
-      it("Should revert with the right error if transactions[_txIndex].Executed == true", async () => {
+      it("Should revert with the right error if transactions[txIndex].Executed == true", async () => {
         const { multiSigWallet, isNotOwner, ether, owners } = await loadFixture(
           deploy
         );
@@ -353,7 +353,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.connect(owners[1]).confirmTransaction(0)
         ).to.be.revertedWith("tx already executed");
       });
-      it("Should revert with the right error if isConfirmed[_txIndex][msg.sender] == true", async () => {
+      it("Should revert with the right error if isConfirmed[txIndex][msg.sender] == true", async () => {
         const { multiSigWallet, isNotOwner, ether } = await loadFixture(deploy);
         await multiSigWallet.submitTransaction(
           isNotOwner,
@@ -397,7 +397,7 @@ describe("MultiSigWallet", () => {
         ).to.be.revertedWith("not owner");
       });
 
-      it("Should revert with the right error if transactionsOwner[_txIndex].Executed == true", async () => {
+      it("Should revert with the right error if transactionsOwner[txIndex].Executed == true", async () => {
         const { multiSigWallet, isNotOwner, owners } = await loadFixture(
           deploy
         );
@@ -408,7 +408,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.connect(owners[1]).executeTransactionOwner(0)
         ).to.be.revertedWith("tx already executed");
       });
-      it("Should revert with the right error if  transactionsOwner[_txIndex].numConfirmations < numConfirmationsRequired", async () => {
+      it("Should revert with the right error if  transactionsOwner[txIndex].numConfirmations < numConfirmationsRequired", async () => {
         const { multiSigWallet, isNotOwner } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionOwner(isNotOwner, true);
         await expect(
@@ -457,7 +457,7 @@ describe("MultiSigWallet", () => {
         ).to.be.revertedWith("not owner");
       });
 
-      it("Should revert with the right error if transactionNewNumConfirmations[_txIndex].Executed == true", async () => {
+      it("Should revert with the right error if transactionNewNumConfirmations[txIndex].Executed == true", async () => {
         const { multiSigWallet, owners } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionNewNumConfirmations(2);
         await multiSigWallet.confirmTransactionNewNumConfirmations(0);
@@ -468,7 +468,7 @@ describe("MultiSigWallet", () => {
             .executeTransactionNewNumConfirmations(0)
         ).to.be.revertedWith("tx already executed");
       });
-      it("Should revert with the right error if  transactionNewNumConfirmations[_txIndex].numConfirmations < numConfirmationsRequired", async () => {
+      it("Should revert with the right error if  transactionNewNumConfirmations[txIndex].numConfirmations < numConfirmationsRequired", async () => {
         const { multiSigWallet } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionNewNumConfirmations(2);
         await expect(
@@ -511,7 +511,7 @@ describe("MultiSigWallet", () => {
         ).to.be.revertedWith("not owner");
       });
 
-      it("Should revert with the right error if transactions[_txIndex].Executed == true", async () => {
+      it("Should revert with the right error if transactions[txIndex].Executed == true", async () => {
         const { multiSigWallet, isNotOwner, ether, owners } = await loadFixture(
           deploy
         );
@@ -530,7 +530,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.connect(owners[1]).executeTransaction(0)
         ).to.be.revertedWith("tx already executed");
       });
-      it("Should revert with the right error if  transactionsOwner[_txIndex].numConfirmations < numConfirmationsRequired", async () => {
+      it("Should revert with the right error if  transactionsOwner[txIndex].numConfirmations < numConfirmationsRequired", async () => {
         const { multiSigWallet, isNotOwner, ether } = await loadFixture(deploy);
         await multiSigWallet.submitTransaction(
           isNotOwner,
@@ -631,7 +631,7 @@ describe("MultiSigWallet", () => {
         ).to.be.revertedWith("not owner");
       });
 
-      it("Should revert with the right error if transactions[_txIndex].Executed == true", async () => {
+      it("Should revert with the right error if transactions[txIndex].Executed == true", async () => {
         const { multiSigWallet, isNotOwner, ether, owners } = await loadFixture(
           deploy
         );
@@ -651,7 +651,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.connect(owners[1]).revokeConfirmation(0)
         ).to.be.revertedWith("tx already executed");
       });
-      it("Should revert with the right error if isConfirmed[_txIndex][msg.sender] == false", async () => {
+      it("Should revert with the right error if isConfirmed[txIndex][msg.sender] == false", async () => {
         const { multiSigWallet, isNotOwner, ether } = await loadFixture(deploy);
         await multiSigWallet.submitTransaction(
           isNotOwner,
@@ -696,7 +696,7 @@ describe("MultiSigWallet", () => {
         ).to.be.revertedWith("not owner");
       });
 
-      it("Should revert with the right error if transactionNewNumConfirmations[_txIndex].Executed == true", async () => {
+      it("Should revert with the right error if transactionNewNumConfirmations[txIndex].Executed == true", async () => {
         const { multiSigWallet } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionNewNumConfirmations(2);
         await multiSigWallet.confirmTransactionNewNumConfirmations(0);
@@ -705,7 +705,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.revokeConfirmationNewNumConfirmations(0)
         ).to.be.revertedWith("tx already executed");
       });
-      it("Should revert with the right error if isConfirmedNewNumConfirmations[_txIndex][msg.sender] == false", async () => {
+      it("Should revert with the right error if isConfirmedNewNumConfirmations[txIndex][msg.sender] == false", async () => {
         const { multiSigWallet } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionNewNumConfirmations(2);
 
@@ -736,7 +736,7 @@ describe("MultiSigWallet", () => {
         ).to.be.revertedWith("not owner");
       });
 
-      it("Should revert with the right error if transactionsOwner[_txIndex].Executed == true", async () => {
+      it("Should revert with the right error if transactionsOwner[txIndex].Executed == true", async () => {
         const { multiSigWallet, isNotOwner, ether, owners } = await loadFixture(
           deploy
         );
@@ -750,7 +750,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.connect(owners[1]).revokeConfirmationOwner(0)
         ).to.be.revertedWith("tx already executed");
       });
-      it("Should revert with the right error if isConfirmedOwner[_txIndex][msg.sender] == false", async () => {
+      it("Should revert with the right error if isConfirmedOwner[txIndex][msg.sender] == false", async () => {
         const { multiSigWallet, isNotOwner } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionOwner(isNotOwner, true);
 
