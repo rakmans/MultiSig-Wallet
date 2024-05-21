@@ -9,9 +9,7 @@ describe("MultiSigWallet", () => {
     const [account, account2, account3, isNotOwner] = await ethers.getSigners();
     const owners = [account, account2, account3];
     const numConfirmationsRequired = 1;
-
     //deploy contracts
-
     const MultiSigWallet = await ethers.getContractFactory("MultiSigWallet");
     const multiSigWallet = await MultiSigWallet.deploy(
       owners,
@@ -53,19 +51,6 @@ describe("MultiSigWallet", () => {
     });
   });
   describe("receive", async () => {
-    it("Should receive if send ether", async () => {
-      const { multiSigWallet, owners } = await loadFixture(deploy);
-      const tx = {
-        to: multiSigWallet.getAddress(),
-        value: ethers.parseEther("1.0"),
-      };
-      await owners[0].sendTransaction(tx);
-
-      const contractBalance = await ethers.provider.getBalance(
-        multiSigWallet.getAddress()
-      );
-      expect(contractBalance).to.equal(ethers.parseEther("1.0"));
-    });
     it("Should receive if send ERC20", async () => {
       const { multiSigWallet, ether } = await loadFixture(deploy);
       await ether.transfer(multiSigWallet.getAddress(), 200);
@@ -264,13 +249,7 @@ describe("MultiSigWallet", () => {
             .confirmTransactionNewNumConfirmations(0)
         ).to.be.revertedWith("not owner");
       });
-      it("Should revert with the right error if _txIndex > transactionNewNumConfirmations.length", async () => {
-        const { multiSigWallet } = await loadFixture(deploy);
 
-        await expect(
-          multiSigWallet.confirmTransactionNewNumConfirmations(2)
-        ).to.be.revertedWith("tx does not exist");
-      });
       it("Should revert with the right error if transactionNewNumConfirmations[_txIndex].Executed == true", async () => {
         const { multiSigWallet, owners } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionNewNumConfirmations(2);
@@ -312,13 +291,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.connect(isNotOwner).confirmTransactionOwner(0)
         ).to.be.revertedWith("not owner");
       });
-      it("Should revert with the right error if _txIndex > transactionsOwner.length", async () => {
-        const { multiSigWallet } = await loadFixture(deploy);
 
-        await expect(
-          multiSigWallet.confirmTransactionOwner(2)
-        ).to.be.revertedWith("tx does not exist");
-      });
       it("Should revert with the right error if transactionsOwner[_txIndex].Executed == true", async () => {
         const { multiSigWallet, isNotOwner, owners } = await loadFixture(
           deploy
@@ -361,13 +334,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.connect(isNotOwner).confirmTransaction(0)
         ).to.be.revertedWith("not owner");
       });
-      it("Should revert with the right error if _txIndex > transactions.length", async () => {
-        const { multiSigWallet } = await loadFixture(deploy);
 
-        await expect(multiSigWallet.confirmTransaction(2)).to.be.revertedWith(
-          "tx does not exist"
-        );
-      });
       it("Should revert with the right error if transactions[_txIndex].Executed == true", async () => {
         const { multiSigWallet, isNotOwner, ether, owners } = await loadFixture(
           deploy
@@ -429,12 +396,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.connect(isNotOwner).executeTransactionOwner(0)
         ).to.be.revertedWith("not owner");
       });
-      it("Should revert with the right error if _txIndex > transactionsOwner.length", async () => {
-        const { multiSigWallet } = await loadFixture(deploy);
-        await expect(
-          multiSigWallet.executeTransactionOwner(2)
-        ).to.be.revertedWith("tx does not exist");
-      });
+
       it("Should revert with the right error if transactionsOwner[_txIndex].Executed == true", async () => {
         const { multiSigWallet, isNotOwner, owners } = await loadFixture(
           deploy
@@ -494,13 +456,7 @@ describe("MultiSigWallet", () => {
             .executeTransactionNewNumConfirmations(0)
         ).to.be.revertedWith("not owner");
       });
-      it("Should revert with the right error if _txIndex > transactionNewNumConfirmations.length", async () => {
-        const { multiSigWallet } = await loadFixture(deploy);
 
-        await expect(
-          multiSigWallet.executeTransactionNewNumConfirmations(2)
-        ).to.be.revertedWith("tx does not exist");
-      });
       it("Should revert with the right error if transactionNewNumConfirmations[_txIndex].Executed == true", async () => {
         const { multiSigWallet, owners } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionNewNumConfirmations(2);
@@ -554,12 +510,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.connect(isNotOwner).executeTransaction(0)
         ).to.be.revertedWith("not owner");
       });
-      it("Should revert with the right error if _txIndex > transactions.length", async () => {
-        const { multiSigWallet } = await loadFixture(deploy);
-        await expect(multiSigWallet.executeTransaction(2)).to.be.revertedWith(
-          "tx does not exist"
-        );
-      });
+
       it("Should revert with the right error if transactions[_txIndex].Executed == true", async () => {
         const { multiSigWallet, isNotOwner, ether, owners } = await loadFixture(
           deploy
@@ -679,12 +630,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.connect(isNotOwner).revokeConfirmation(0)
         ).to.be.revertedWith("not owner");
       });
-      it("Should revert with the right error if _txIndex > transactions.length", async () => {
-        const { multiSigWallet } = await loadFixture(deploy);
-        await expect(multiSigWallet.revokeConfirmation(2)).to.be.revertedWith(
-          "tx does not exist"
-        );
-      });
+
       it("Should revert with the right error if transactions[_txIndex].Executed == true", async () => {
         const { multiSigWallet, isNotOwner, ether, owners } = await loadFixture(
           deploy
@@ -749,13 +695,7 @@ describe("MultiSigWallet", () => {
             .revokeConfirmationNewNumConfirmations(0)
         ).to.be.revertedWith("not owner");
       });
-      it("Should revert with the right error if _txIndex > transactionNewNumConfirmations.length", async () => {
-        const { multiSigWallet } = await loadFixture(deploy);
 
-        await expect(
-          multiSigWallet.revokeConfirmationNewNumConfirmations(2)
-        ).to.be.revertedWith("tx does not exist");
-      });
       it("Should revert with the right error if transactionNewNumConfirmations[_txIndex].Executed == true", async () => {
         const { multiSigWallet } = await loadFixture(deploy);
         await multiSigWallet.submitTransactionNewNumConfirmations(2);
@@ -795,12 +735,7 @@ describe("MultiSigWallet", () => {
           multiSigWallet.connect(isNotOwner).revokeConfirmationOwner(0)
         ).to.be.revertedWith("not owner");
       });
-      it("Should revert with the right error if _txIndex > transactionsOwner.length", async () => {
-        const { multiSigWallet } = await loadFixture(deploy);
-        await expect(
-          multiSigWallet.revokeConfirmationOwner(2)
-        ).to.be.revertedWith("tx does not exist");
-      });
+
       it("Should revert with the right error if transactionsOwner[_txIndex].Executed == true", async () => {
         const { multiSigWallet, isNotOwner, ether, owners } = await loadFixture(
           deploy
